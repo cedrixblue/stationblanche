@@ -1,0 +1,165 @@
+2. Installation de Debian
+Démarrer depuis la clé USB :
+
+Insérez la clé USB et configurez le BIOS/UEFI pour démarrer depuis celle-ci.
+Lancer l’installation :
+
+Sélectionnez "Install" ou "Graphical Install".
+Choisissez uniquement les paquets essentiels pour un système minimal (pas d’environnement graphique).
+3. Configuration du partitionnement sans chiffrement
+Sélectionner le mode manuel pour le partitionnement :
+
+Choisissez un partitionnement simplifié, adapté à ton besoin d’un disque sans chiffrement :
+/boot : 512 Mo en ext4 (optionnel si besoin de compatibilité legacy BIOS).
+/ : Le reste de l’espace disque en ext4.
+Configurer les points de montage :
+
+/ : Racine du système, contient tout.
+Montage temporaire pour périphériques USB :
+Configure des points de montage à la demande (voir partie suivante pour les scripts).
+Valider et appliquer le partitionnement :
+
+Supprime les partitions inutiles si le disque avait des données existantes.
+
+4. Durcissement initial après installation
+Mettre à jour immédiatement le système :
+
+Après l’installation, connecte temporairement la machine à un réseau isolé pour les mises à jour :
+bash
+Copier le code
+sudo apt update && sudo apt upgrade -y
+Supprimer les services inutiles :
+
+Liste les services installés par défaut :
+bash
+Copier le code
+systemctl list-units --type=service
+Désactive ou supprime ceux qui ne sont pas nécessaires :
+bash
+Copier le code
+sudo systemctl disable <service>
+Configurer un utilisateur principal avec droits limités :
+
+Création de l’utilisateur :
+bash
+Copier le code
+sudo adduser analyste
+Ajouter l’utilisateur au groupe sudo pour les commandes administratives :
+bash
+Copier le code
+sudo usermod -aG sudo analyste
+Désactiver les connexions root en SSH :
+Même si la machine est isolée, il est préférable de limiter les accès root par défaut.
+
+1. Désactiver les connexions root en SSH
+Même si la machine est isolée, cette configuration évite d'utiliser le compte root directement pour des raisons de sécurité. Voici les étapes détaillées :
+
+Vérifier que le serveur SSH est installé (facultatif) :
+Si openssh-server est déjà installé, passe à l'étape suivante. Sinon :
+
+bash
+Copier le code
+sudo apt install openssh-server
+Modifier la configuration du serveur SSH :
+
+Édite le fichier de configuration :
+bash
+Copier le code
+sudo nano /etc/ssh/sshd_config
+Recherchez la ligne suivante :
+bash
+Copier le code
+PermitRootLogin yes
+Modifiez-la pour désactiver les connexions root :
+bash
+Copier le code
+PermitRootLogin no
+Redémarrer le service SSH pour appliquer les modifications :
+
+bash
+Copier le code
+sudo systemctl restart ssh
+Tester la connexion SSH (si nécessaire) :
+
+Connectez-vous en tant qu'utilisateur non-root (analyste, par exemple). Si la connexion root est bloquée, la configuration est correcte.
+ Créer une règle udev pour appliquer les options sécurisées
+Créez un fichier de règle :
+bash
+Copier le code
+sudo nano /etc/udev/rules.d/99-usb-secure-mount.rules
+Ajoutez la règle suivante :
+plaintext
+Copier le code
+ACTION=="add", SUBSYSTEM=="block", KERNEL=="sd[b-z][1-9]", ENV{ID_FS_TYPE}!="", RUN+="/bin/mount -o noexec,nodev,nosuid /dev/%k /media/usb_%k"
+ACTION=="remove", SUBSYSTEM=="block", KERNEL=="sd[b-z][1-9]", RUN+="/bin/umount /media/usb_%k && /bin/rmdir /media/usb_%k"
+Explications :
+ACTION=="add" : Monte les périphériques lors de leur branchement.
+ENV{ID_FS_TYPE}!="", : Monte uniquement si un système de fichiers est détecté.
+RUN+="/bin/mount -o noexec,nodev,nosuid /dev/%k /media/usb_%k" : Monte le périphérique avec les options sécurisées dans /media/usb_<nom_du_dispositif>.
+ACTION=="remove" : Démonte et nettoie automatiquement le point de montage lors du retrait.
+2. Créer le répertoire de montage de base
+Créez un répertoire parent où tous les périphériques USB seront montés :
+
+bash
+Copier le code
+sudo mkdir -p /media/usb
+sudo chmod 755 /media/usb
+3. Recharger les règles udev
+Pour activer la nouvelle règle :
+
+bash
+Copier le code
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+4. Tester
+Branchez une clé USB.
+Vérifiez qu'elle est montée dans /media/usb_<nom_du_dispositif> avec les options sécurisées :
+bash
+Copier le code
+mount | grep /media/usb
+Retirez la clé USB et vérifiez que le point de montage est supprimé automatiquement :
+bash
+Copier le code
+ls /media/usb
+
+=====================================================
+=====================================================
+=====================================================
+
+Liste des outils à installer
+ClamAV (antivirus).
+Chkrootkit et Rkhunter (détection de rootkits).
+ESET (antivirus propriétaire).
+Firejail (sandboxing).
+AppArmor (contrôle des permissions).
+1. Installer ClamAV
+Commandes :
+
+bash
+Copier le code
+sudo apt update
+sudo apt install clamav clamav-daemon -y
+Configurer les mises à jour des signatures :
+
+Activer le service de mise à jour automatique :
+
+bash
+Copier le code
+sudo systemctl enable clamav-freshclam
+sudo systemctl start clamav-freshclam
+Vérifier que les bases de données sont à jour :
+
+bash
+Copier le code
+sudo freshclam
+Tester ClamAV :
+
+Scanner un fichier de test :
+bash
+Copier le code
+echo "X5O!P%@AP[4\\PZX54(P^)7CC)7}$EICAR-STANDARD-ANTIVIRUS-TEST-FILE!$H+H*" > testfile
+clamscan testfile
+
+
+
+2. Installer Chkrootkit
